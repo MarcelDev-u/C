@@ -270,29 +270,44 @@ static int base64_encode(const unsigned char *in, size_t in_len, char *out, size
     size_t i = 0;
     size_t j = 0;
 
-    while (i < in_len) {
-        unsigned int a = in[i++];
-        unsigned int b = (i < in_len) ? in[i++] : 0;
-        unsigned int c = (i < in_len) ? in[i++] : 0;
-
+    // Full 3-byte chunks -> 4 base64 chars each.
+    while (i + 2 < in_len) {
         if (j + 4 >= out_size) {
             return -1;
         }
+        unsigned int a = in[i++];
+        unsigned int b = in[i++];
+        unsigned int c = in[i++];
 
         out[j++] = tbl[(a >> 2) & 0x3F];
         out[j++] = tbl[((a & 0x03) << 4) | ((b >> 4) & 0x0F)];
-        out[j++] = (i - 1 <= in_len) ? tbl[((b & 0x0F) << 2) | ((c >> 6) & 0x03)] : '=';
-        out[j++] = (i <= in_len) ? tbl[c & 0x3F] : '=';
+        out[j++] = tbl[((b & 0x0F) << 2) | ((c >> 6) & 0x03)];
+        out[j++] = tbl[c & 0x3F];
+    }
 
-        if (i == in_len + 1) {
-            out[j - 1] = '=';
+    // Remainder: 1 or 2 bytes with standard '=' padding.
+    if (i < in_len) {
+        if (j + 4 >= out_size) {
+            return -1;
         }
+        unsigned int a = in[i++];
+        out[j++] = tbl[(a >> 2) & 0x3F];
+
         if (i == in_len) {
-            out[j - 2] = '=';
-            out[j - 1] = '=';
+            out[j++] = tbl[(a & 0x03) << 4];
+            out[j++] = '=';
+            out[j++] = '=';
+        } else {
+            unsigned int b = in[i++];
+            out[j++] = tbl[((a & 0x03) << 4) | ((b >> 4) & 0x0F)];
+            out[j++] = tbl[(b & 0x0F) << 2];
+            out[j++] = '=';
         }
     }
 
+    if (j >= out_size) {
+        return -1;
+    }
     out[j] = '\0';
     return 0;
 }
